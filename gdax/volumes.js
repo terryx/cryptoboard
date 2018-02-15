@@ -3,8 +3,8 @@ const Gdax = require('gdax')
 const moment = require('moment')
 const { argv } = require('yargs')
 const config = require(`../config.${argv.env}`)
+const datadog = require('../utils/datadog')(config.datadog.api_key)
 const numeral = require('numeral')
-const request = require('request-promise')
 const currency = argv.currency
 const websocket = new Gdax.WebsocketClient([`${currency.toUpperCase()}-USD`])
 
@@ -35,25 +35,15 @@ const stream = () => {
       }
     }, { value: 0, time: '' })
     .throttleTime(5000)
-    .mergeMap(res => Observable.fromPromise(request({
-      method: 'POST',
-      uri: 'https://app.datadoghq.com/api/v1/series',
-      qs: {
-        api_key: config.datadog.api_key
-      },
-      body: {
-        series: [
-          {
-            metric: `gdax.${argv.env}.${currency.toLowerCase()}.volumes`,
-            points: [[res.time, res.value]],
-            type: 'gauge',
-            host: 'api.gdax.com',
-            tags: [`gdax:${argv.env}`]
-          }
-        ]
-      },
-      json: true
-    })))
+    .mergeMap(res => Observable.fromPromise(datadog.send([
+      {
+        metric: `gdax.${argv.env}.${currency.toLowerCase()}.volumes`,
+        points: [[res.time, res.value]],
+        type: 'gauge',
+        host: 'api.gdax.com',
+        tags: [`gdax:${argv.env}`]
+      }
+    ])))
     .subscribe(
       console.log,
       console.log
