@@ -51,7 +51,6 @@ const stream = () => {
     })
     .bufferTime(5000)
     .filter(res => res.length > 0)
-    .do(console.info)
     .mergeMap(points => Observable.fromPromise(datadog.send([
       {
         metric: `gdax.${argv.env}.${currency.toLowerCase()}.whales`,
@@ -61,11 +60,13 @@ const stream = () => {
         tags: [`gdax:${argv.env}`]
       }
     ])))
-    .subscribe({}, (err) => {
-      console.error(err.message)
-      websocket.complete()
-      stream()
-    })
+    .subscribe(
+      () => {},
+      (err) => {
+        console.error(err.message)
+        websocket.complete()
+      }
+    )
 
   return next(websocket)
 }
