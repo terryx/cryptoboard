@@ -3,6 +3,7 @@ const moment = require('moment')
 const { argv } = require('yargs')
 const config = require(`../config.${argv.env}`)
 const datadog = require('../utils/datadog')(config.datadog.api_key)
+const notification = require('../utils/notification')
 const numeral = require('numeral')
 const currency = argv.currency
 const w3cwebsocket = require('websocket').w3cwebsocket
@@ -31,6 +32,16 @@ const stream = () => {
     .filter(res => res.type === 'received')
     .distinct(res => res.order_id)
     .filter(res => getTotal(res.size, res.price).value() >= config.gdax.filter_amount)
+    .do(res => {
+      const total = getTotal(res.size, res.price)
+
+      if (total.value() >= config.gdax.notify_amount) {
+        const message = `GDAX ${res.product_id} <b>${res.side.toUpperCase()}</b> ${total.format('$0.00')}`
+        notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
+      }
+
+      return res
+    })
     .map(res => {
       const total = getTotal(res.size, res.price)
       const point = []
