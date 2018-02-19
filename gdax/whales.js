@@ -36,8 +36,8 @@ const stream = () => {
       const total = getTotal(res.size, res.price)
 
       if (total.value() >= config.gdax.notify_amount) {
-        const message = `GDAX ${res.product_id} <b>${res.side.toUpperCase()}</b> ${total.format('$0.00')}`
-        notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
+        const message = `GDAX ${res.product_id} <b>${res.side.toUpperCase()}</b> ${total.format('$0.00a')}`
+        notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message).then(console.log)
       }
 
       return res
