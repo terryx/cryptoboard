@@ -48,7 +48,7 @@ const stream = () => {
         notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
       }
 
-      if (point[1].value() <= (config.bitfinex.filter_buy_amount * 5)) {
+      if (point[1].value() <= (config.bitfinex.filter_sell_amount * 5)) {
         const message = `Bitfinex ${currency.toUpperCase()}-USD SELL ${point[1].format('$0.00a')}`
         notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
       }
