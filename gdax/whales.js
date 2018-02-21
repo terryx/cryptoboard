@@ -5,81 +5,83 @@ const config = require(`../config.${argv.env}`)
 const datadog = require('../utils/datadog')(config.datadog.api_key)
 const notification = require('../utils/notification')
 const numeral = require('numeral')
-const currency = argv.currency
-const w3cwebsocket = require('websocket').w3cwebsocket
+const Gdax = require('gdax')
+const websocket = new Gdax.WebsocketClient(['BTC-USD', 'ETH-USD', 'LTC-USD', 'BCH-USD'])
 
 const getTotal = (size, price) => {
   return numeral(size).multiply(numeral(price).value())
 }
 
-const next = (socket) => {
-  return socket.next(JSON.stringify({
-    type: 'subscribe',
-    channels: ['full'],
-    product_ids: [
-      `${currency.toUpperCase()}-USD`
-    ]
-  }))
-}
+Observable
+  .fromEvent(websocket, 'message')
+  .filter(res => res.type === 'received')
+  .distinct(res => res.order_id)
+  .filter(res => numeral(res.size).value() >= config.gdax.product_ids[res.product_id])
+  .filter(res => getTotal(res.size, res.price).value() >= config.gdax.filter_amount)
+  .do(res => {
+    const total = getTotal(res.size, res.price)
 
-const stream = () => {
-  const websocket = Observable.webSocket({
-    url: `wss://ws-feed.gdax.com`,
-    WebSocketCtor: w3cwebsocket
+    if (total.value() >= config.gdax.notify_amount) {
+      const message = `
+GDAX ${res.product_id}
+<b>${res.side.toUpperCase()}</b> ${numeral(res.size).format('0.00')} at ${total.format('$0.00a')}
+`
+      notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
+    }
+
+    return res
   })
+  .bufferTime(5000)
+  .mergeMap(res => {
+    const products = {
+      'BTC-USD': [],
+      'ETH-USD': [],
+      'LTC-USD': [],
+      'BCH-USD': []
+    }
 
-  websocket
-    .filter(res => res.type === 'received')
-    .distinct(res => res.order_id)
-    .filter(res => getTotal(res.size, res.price).value() >= config.gdax.filter_amount)
-    .do(res => {
-      const total = getTotal(res.size, res.price)
+    return Observable
+      .from(res)
+      .map(res => {
+        const total = getTotal(res.size, res.price)
+        const point = []
 
-      if (total.value() >= config.gdax.notify_amount) {
-        const message = `GDAX ${numeral(res.size).format('0.00')} ${currency.toUpperCase()} <b>${res.side.toUpperCase()}</b> ${total.format('$0.00a')}`
-        notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message).then(console.log)
-      }
+        point.push(moment(res.time).format('X'))
 
-      return res
-    })
-    .map(res => {
-      const total = getTotal(res.size, res.price)
-      const point = []
+        const side = res.side.toUpperCase()
 
-      point.push(moment(res.time).format('X'))
+        if (side === 'BUY') {
+          point.push(total.format('0.00'))
+        }
 
-      const side = res.side.toUpperCase()
+        if (side === 'SELL') {
+          point.push(numeral(0).subtract(total.value()).format('0.00'))
+        }
 
-      if (side === 'BUY') {
-        point.push(total.format('0.00'))
-      }
+        products[res.product_id].push(point)
 
-      if (side === 'SELL') {
-        point.push(numeral(0).subtract(total.value()).format('0.00'))
-      }
-
-      return point
-    })
-    .bufferTime(5000)
-    .filter(res => res.length > 0)
-    .mergeMap(points => Observable.fromPromise(datadog.send([
-      {
-        metric: `gdax.${argv.env}.${currency.toLowerCase()}.whales`,
-        points: points,
-        type: 'gauge',
-        host: 'api.gdax.com',
-        tags: [`gdax:${argv.env}`]
-      }
-    ])))
-    .subscribe(
-      () => {},
-      (err) => {
-        console.error(err.message)
-        websocket.complete()
-      }
-    )
-
-  return next(websocket)
-}
-
-stream()
+        return res
+      })
+      .map(() => products)
+  })
+  .mergeMap(products => {
+    return Observable
+      .from(Object.keys(products))
+      .filter(res => products[res].length > 0)
+      .mergeMap(res => Observable.fromPromise(datadog.send([
+        {
+          metric: `gdax.${argv.env}.${res}.whales`,
+          points: products[res],
+          type: 'gauge',
+          host: 'api.gdax.com',
+          tags: [`gdax:${argv.env}`]
+        }
+      ])))
+  })
+  .subscribe(
+    res => console.log(res),
+    (err) => {
+      console.error(err.message)
+      websocket.complete()
+    }
+  )
