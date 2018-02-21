@@ -17,11 +17,11 @@ const stream = () => {
   })
 
   websocket
-    .filter(res => res.type !== 'initial')
+    .filter(res => res.type === 'update')
     .mergeMap(res => Observable
       .from(res.events)
-      .filter(event => event.reason === 'place' && numeral(event.delta).value() > 0)
-      .filter(event => getTotal(event.price, event.delta).value() >= config.gemini.filter_amount)
+      .filter(event => event.reason === 'place')
+      .filter(res => numeral(res.delta).value() >= config.gemini.currency_amount[currency.toLowerCase()])
       .map(event => {
         const total = getTotal(event.price, event.delta)
         const point = []
@@ -43,7 +43,6 @@ const stream = () => {
     )
     .bufferTime(5000)
     .filter(res => res.length > 0)
-    .do(console.info)
     .mergeMap(points => Observable.fromPromise(datadog.send([
       {
         metric: `gemini.${argv.env}.${currency.toLowerCase()}.whales`,
@@ -54,7 +53,7 @@ const stream = () => {
       }
     ])))
     .subscribe(
-      () => {},
+      console.info,
       (err) => {
         console.error(err.message)
         websocket.complete()
