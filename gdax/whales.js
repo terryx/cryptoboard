@@ -6,7 +6,8 @@ const datadog = require('../utils/datadog')(config.datadog.api_key)
 const notification = require('../utils/notification')
 const numeral = require('numeral')
 const Gdax = require('gdax')
-const websocket = new Gdax.WebsocketClient(['BTC-USD', 'ETH-USD', 'LTC-USD', 'BCH-USD'])
+const currency = argv.currency
+const websocket = new Gdax.WebsocketClient([`${currency.toLowerCase()}-USD`])
 
 const getTotal = (size, price) => {
   return numeral(size).multiply(numeral(price).value())
@@ -16,7 +17,7 @@ Observable
   .fromEvent(websocket, 'message')
   .filter(res => res.type === 'received')
   .distinct(res => res.order_id)
-  .filter(res => numeral(res.size).value() >= config.gdax.product_ids[res.product_id])
+  .filter(res => numeral(res.size).value() >= config.gdax.currency[currency])
   .filter(res => getTotal(res.size, res.price).value() >= config.gdax.filter_amount)
   .do(res => {
     const total = getTotal(res.size, res.price)
@@ -31,53 +32,35 @@ GDAX ${res.product_id}
 
     return res
   })
-  .bufferTime(5000)
-  .mergeMap(res => {
-    const products = {
-      'BTC-USD': [],
-      'ETH-USD': [],
-      'LTC-USD': [],
-      'BCH-USD': []
+  .map(res => {
+    const total = getTotal(res.size, res.price)
+    const point = []
+
+    point.push(moment(res.time).format('X'))
+
+    const side = res.side.toUpperCase()
+
+    if (side === 'BUY') {
+      point.push(total.format('0.00'))
     }
 
-    return Observable
-      .from(res)
-      .map(res => {
-        const total = getTotal(res.size, res.price)
-        const point = []
+    if (side === 'SELL') {
+      point.push(numeral(0).subtract(total.value()).format('0.00'))
+    }
 
-        point.push(moment(res.time).format('X'))
-
-        const side = res.side.toUpperCase()
-
-        if (side === 'BUY') {
-          point.push(total.format('0.00'))
-        }
-
-        if (side === 'SELL') {
-          point.push(numeral(0).subtract(total.value()).format('0.00'))
-        }
-
-        products[res.product_id].push(point)
-
-        return res
-      })
-      .map(() => products)
+    return point
   })
-  .mergeMap(products => {
-    return Observable
-      .from(Object.keys(products))
-      .filter(res => products[res].length > 0)
-      .mergeMap(res => Observable.fromPromise(datadog.send([
-        {
-          metric: `gdax.${argv.env}.${res}.whales`,
-          points: products[res],
-          type: 'gauge',
-          host: 'api.gdax.com',
-          tags: [`gdax:${argv.env}`]
-        }
-      ])))
-  })
+  .bufferTime(5000)
+  .filter(res => res.length > 0)
+  .mergeMap(points => Observable.fromPromise(datadog.send([
+    {
+      metric: `gdax.${argv.env}.${currency}.whales`,
+      points: points,
+      type: 'gauge',
+      host: 'api.gdax.com',
+      tags: [`gdax:${argv.env}`]
+    }
+  ])))
   .subscribe(
     console.info,
     console.error
