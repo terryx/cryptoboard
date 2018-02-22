@@ -79,9 +79,6 @@ GDAX ${res.product_id}
       ])))
   })
   .subscribe(
-    res => console.log(res),
-    (err) => {
-      console.error(err.message)
-      websocket.complete()
-    }
+    console.info,
+    console.error
   )
