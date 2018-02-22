@@ -54,7 +54,9 @@ const stream = () => {
         side = 'BUY'
       }
 
-      if (total.value() >= config.bitfinex.notify_amount) {
+      const notifyBuyAmount = config.bitfinex.filter_buy_amount * 5
+      const notifySellAmount = config.bitfinex.filter_sell_amount * 5
+      if (total.value() >= notifyBuyAmount || total.value() <= notifySellAmount) {
         const message = `
 Bitfinex ${currency.toUpperCase()}-USD
 <b>${side}</b> ${numeral(size).format('0.00')} at ${total.format('$0.00a')}
