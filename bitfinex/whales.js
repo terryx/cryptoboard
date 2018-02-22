@@ -3,6 +3,7 @@ const { argv } = require('yargs')
 const moment = require('moment')
 const config = require(`../config.${argv.env}`)
 const datadog = require('../utils/datadog')(config.datadog.api_key)
+const notification = require('../utils/notification')
 const numeral = require('numeral')
 const currency = argv.currency
 const w3cwebsocket = require('websocket').w3cwebsocket
@@ -39,6 +40,28 @@ const stream = () => {
       getTotal(row[2], row[1]).value() >= config.bitfinex.filter_buy_amount ||
       getTotal(row[2], row[1]).value() <= config.bitfinex.filter_sell_amount
     )
+    .do(data => {
+      const size = data[2]
+      const price = data[1]
+      const total = getTotal(size, price)
+
+      let side = ''
+      if (total.value() <= 0) {
+        side = 'SELL'
+      }
+
+      if (total.value() >= 0) {
+        side = 'BUY'
+      }
+
+      if (total.value() >= config.bitfinex.notify_amount) {
+        const message = `
+Bitfinex ${currency.toUpperCase()}-USD
+<b>${side}</b> ${numeral(size).format('0.00')} at ${total.format('$0.00a')}
+  `
+        notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
+      }
+    })
     .map(data => {
       const point = []
       const time = moment().format('X')
