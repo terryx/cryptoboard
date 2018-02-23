@@ -21,6 +21,8 @@ const next = (socket) => {
   }))
 }
 
+const volume = numeral(0)
+
 const stream = () => {
   const websocket = Observable.webSocket({
     url: `wss://api.bitfinex.com/ws/2`,
@@ -33,37 +35,37 @@ const stream = () => {
     .skip(1)
     .filter(row => row[1] > 0)
     .filter(row =>
-      numeral(row[2]).value() >= config.bitfinex.currency_amount[currency.toLowerCase()].positive ||
-      numeral(row[2]).value() <= config.bitfinex.currency_amount[currency.toLowerCase()].negative
+      numeral(row[2]).value() >= config.bitfinex.currency[currency.toLowerCase()].positive ||
+      numeral(row[2]).value() <= config.bitfinex.currency[currency.toLowerCase()].negative
     )
     .filter(row =>
-      getTotal(row[2], row[1]).value() >= config.bitfinex.filter_buy_amount ||
-      getTotal(row[2], row[1]).value() <= config.bitfinex.filter_sell_amount
+      getTotal(row[2], row[1]).value() >= config.bitfinex.filter_amount.buy ||
+      getTotal(row[2], row[1]).value() <= config.bitfinex.filter_amount.sell
     )
-    .do(data => {
-      const size = data[2]
-      const price = data[1]
-      const total = getTotal(size, price)
-
-      let side = ''
-      if (total.value() <= 0) {
-        side = 'SELL'
-      }
-
-      if (total.value() >= 0) {
-        side = 'BUY'
-      }
-
-      const notifyBuyAmount = config.bitfinex.filter_buy_amount * config.bitfinex.filter_amount_factor
-      const notifySellAmount = config.bitfinex.filter_sell_amount * config.bitfinex.filter_amount_factor
-      if (total.value() >= notifyBuyAmount || total.value() <= notifySellAmount) {
-        const message = `
-Bitfinex ${currency.toUpperCase()}-USD
-<b>${side}</b> ${numeral(size).format('0.00')} at ${total.format('$0.00a')}
-  `
-        notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
-      }
-    })
+//     .do(data => {
+//       const size = data[2]
+//       const price = data[1]
+//       const total = getTotal(size, price)
+//
+//       let side = ''
+//       if (total.value() <= 0) {
+//         side = 'SELL'
+//       }
+//
+//       if (total.value() >= 0) {
+//         side = 'BUY'
+//       }
+//
+//       const notifyBuyAmount = config.bitfinex.filter_buy_amount * config.bitfinex.filter_amount_factor
+//       const notifySellAmount = config.bitfinex.filter_sell_amount * config.bitfinex.filter_amount_factor
+//       if (total.value() >= notifyBuyAmount || total.value() <= notifySellAmount) {
+//         const message = `
+// Bitfinex ${currency.toUpperCase()}-USD
+// <b>${side}</b> ${numeral(size).format('0.00')} at ${total.format('$0.00a')}
+//   `
+//         notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
+//       }
+//     })
     .map(data => {
       const point = []
       const time = moment().format('X')
@@ -71,13 +73,40 @@ Bitfinex ${currency.toUpperCase()}-USD
       const price = data[1]
       const total = getTotal(size, price).value()
 
+      if (total >= 0) {
+        volume.add(total)
+      }
+
+      if (total <= 0) {
+        volume.subtract(total)
+      }
+
       point.push(time, total)
 
       return point
     })
     .bufferTime(5000)
+    .do(() => {
+      if (volume.value() >= config.bitfinex.notify_amount.buy) {
+        const message = `
+Bitfinex ${currency.toUpperCase()}
+<b>BUY</b> wall reach ${volume.format('$0.00a')}
+`
+        notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
+        volume.set(0)
+      }
+
+      if (volume.value() <= config.bitfinex.notify_amount.sell) {
+        const message = `
+Bitfinex ${currency.toUpperCase()}
+<b>SELL</b> wall reach ${volume.format('$0.00a')}
+  `
+        notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
+        volume.set(0)
+      }
+    })
     .filter(points => points.length > 0)
-    .mergeMap(points => Observable.fromPromise(datadog.send([
+    .do(points => datadog.send([
       {
         metric: `bitfinex.${argv.env}.${currency.toLowerCase()}.whales`,
         points: points,
@@ -85,9 +114,9 @@ Bitfinex ${currency.toUpperCase()}-USD
         host: currency.toLowerCase(),
         tags: [`bitfinex:${argv.env}`]
       }
-    ])))
+    ]))
     .subscribe(
-      console.info,
+      () => console.info(volume.format('$0.00a')),
       (err) => {
         console.error(err.message)
         websocket.complete()

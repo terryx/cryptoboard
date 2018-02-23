@@ -22,13 +22,13 @@ const next = (socket) => {
   }))
 }
 
+const volume = numeral(0)
+
 const stream = () => {
   const websocket = Observable.webSocket({
     url: `wss://ws-feed.gdax.com`,
     WebSocketCtor: w3cwebsocket
   })
-
-  const volume = numeral(0)
 
   websocket
     .filter(res => res.type === 'received')
@@ -55,6 +55,7 @@ const stream = () => {
 
       return point
     })
+    .bufferTime(5000)
     .do(() => {
       if (volume.value() >= config.gdax.notify_amount.buy) {
         const message = `
@@ -74,7 +75,6 @@ GDAX ${currency.toUpperCase()}
         volume.set(0)
       }
     })
-    .bufferTime(5000)
     .filter(res => res.length > 0)
     .do(points => datadog.send([
       {
