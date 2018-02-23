@@ -111,6 +111,13 @@ Bitfinex ${currency.toUpperCase()}
         metric: `bitfinex.${argv.env}.${currency.toLowerCase()}.whales`,
         points: points,
         type: 'gauge',
+        host: 'bitfinex',
+        tags: [`bitfinex:${argv.env}`]
+      },
+      {
+        metric: `bitfinex.${argv.env}.${currency}.volumes`,
+        points: [ [moment().format('X'), volume.format('0.00')] ],
+        type: 'gauge',
         host: currency.toLowerCase(),
         tags: [`bitfinex:${argv.env}`]
       }

@@ -81,7 +81,14 @@ GDAX ${currency.toUpperCase()}
         metric: `gdax.${argv.env}.${currency}.whales`,
         points: points,
         type: 'gauge',
-        host: 'api.gdax.com',
+        host: 'gdax',
+        tags: [`gdax:${argv.env}`]
+      },
+      {
+        metric: `gdax.${argv.env}.${currency}.volumes`,
+        points: [ [moment().format('X'), volume.format('0.00')] ],
+        type: 'gauge',
+        host: currency.toLowerCase(),
         tags: [`gdax:${argv.env}`]
       }
     ]))
