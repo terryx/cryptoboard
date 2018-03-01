@@ -5,5 +5,5 @@ Display time series information to datadog via socket buffer
 ```bash
 cp config.sample.js config.dev.js
 npm install
-npm run gdax:volume -- --env=dev --currency=eth
+npm run gdax:whales -- --env=dev --currency=eth
 ```

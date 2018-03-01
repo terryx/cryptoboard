@@ -31,12 +31,12 @@ const stream = () => {
   })
 
   websocket
-    .filter(res => res.type === 'received')
+    .filter(res => res.type === 'open' && res.reason !== 'canceled')
     .distinct(res => res.order_id)
-    .filter(res => numeral(res.size).value() >= config.gdax.currency[currency])
-    .filter(res => getTotal(res.size, res.price).value() >= config.gdax.filter_amount)
+    .filter(res => numeral(res.remaining_size).value() >= config.gdax.currency[currency])
+    .filter(res => getTotal(res.remaining_size, res.price).value() >= config.gdax.filter_amount)
     .map(res => {
-      const total = getTotal(res.size, res.price)
+      const total = getTotal(res.remaining_size, res.price)
       const point = []
 
       point.push(moment(res.time).format('X'))

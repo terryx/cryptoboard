@@ -4,9 +4,8 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "gdax:volume": "node gdax/volumes.js",
-    "gdax:whale": "node gdax/whales.js"
+    "test": "NODE_ENV=dev ava",
+    "gdax:whales": "node gdax/whales.js"
   },
   "repository": {
     "type": "git",
@@ -26,7 +25,9 @@
     "gdax": "^0.6.0",
     "lodash": "^4.17.5",
     "moment": "^2.20.1",
+    "nodemon": "^1.17.1",
     "numeral": "^2.0.6",
+    "query-string": "^5.1.0",
     "request": "^2.83.0",
     "request-promise": "^4.2.2",
     "rxjs": "^5.5.6",
@@ -34,5 +35,7 @@
     "websocket": "^1.0.25",
     "yargs": "^11.0.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "ava": "^0.25.0"
+  }
 }
