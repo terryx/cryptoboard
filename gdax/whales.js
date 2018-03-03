@@ -1,4 +1,3 @@
-const { Observable } = require('rxjs')
 const moment = require('moment')
 const { argv } = require('yargs')
 const config = require(`../config.${argv.env}`)
@@ -6,37 +5,21 @@ const datadog = require('../utils/datadog')(config.datadog.api_key)
 const notification = require('../utils/notification')
 const numeral = require('numeral')
 const currency = argv.currency
-const w3cwebsocket = require('websocket').w3cwebsocket
-
-const getTotal = (size, price) => {
-  return numeral(size).multiply(numeral(price).value())
-}
-
-const next = (socket) => {
-  return socket.next(JSON.stringify({
-    type: 'subscribe',
-    channels: ['full'],
-    product_ids: [
-      `${currency.toUpperCase()}-USD`
-    ]
-  }))
-}
-
-const volume = numeral(0)
+const gdax = require('./stream')
 
 const stream = () => {
-  const websocket = Observable.webSocket({
-    url: `wss://ws-feed.gdax.com`,
-    WebSocketCtor: w3cwebsocket
-  })
+  const data = {
+    productId: `${currency.toUpperCase()}-USD`,
+    filterSize: config.gdax.currency[currency],
+    filterTotalPrice: config.gdax.filter_amount
+  }
 
-  websocket
-    .filter(res => res.type === 'open' && res.reason !== 'canceled')
-    .distinct(res => res.order_id)
-    .filter(res => numeral(res.remaining_size).value() >= config.gdax.currency[currency])
-    .filter(res => getTotal(res.remaining_size, res.price).value() >= config.gdax.filter_amount)
+  const volume = numeral(0)
+
+  return gdax
+    .stream(data)
     .map(res => {
-      const total = getTotal(res.remaining_size, res.price)
+      const total = gdax.getTotal(res.remaining_size, res.price)
       const point = []
 
       point.push(moment(res.time).format('X'))
@@ -44,13 +27,13 @@ const stream = () => {
       const side = res.side.toUpperCase()
 
       if (side === 'BUY') {
-        volume.add(total.value())
-        point.push(total.format('0.00'))
+        volume.add(total)
+        point.push(numeral(total).format('0.00'))
       }
 
       if (side === 'SELL') {
-        volume.subtract(total.value())
-        point.push(numeral(0).subtract(total.value()).format('0.00'))
+        volume.subtract(total)
+        point.push(numeral(0).subtract(total).format('0.00'))
       }
 
       return point
@@ -96,12 +79,10 @@ GDAX ${currency.toUpperCase()}
       () => console.info(volume.format('$0.00a')),
       (err) => {
         console.error(err.message)
-        websocket.complete()
+        stream()
       },
       () => stream()
     )
-
-  return next(websocket)
 }
 
 stream()

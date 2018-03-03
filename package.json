@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/terryx/cryptoboard#readme",
   "dependencies": {
+    "chalk": "^2.3.1",
     "gdax": "^0.6.0",
     "lodash": "^4.17.5",
     "moment": "^2.20.1",
