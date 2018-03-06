@@ -1,5 +1,7 @@
 const moment = require('moment')
 const { argv } = require('yargs')
+const { Observable } = require('rxjs')
+const { isEmpty } = require('lodash')
 const config = require(`../config.${argv.env}`)
 const datadog = require('../utils/datadog')(config.datadog.api_key)
 const notification = require('../utils/notification')
@@ -39,25 +41,6 @@ const stream = () => {
       return point
     })
     .bufferTime(5000)
-    .do(() => {
-      if (volume.value() >= config.gdax.notify_amount.buy) {
-        const message = `
-GDAX ${currency.toUpperCase()}
-<b>BUY</b> wall reach ${volume.format('$0.00a')}
-`
-        notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
-        volume.set(0)
-      }
-
-      if (volume.value() <= config.gdax.notify_amount.sell) {
-        const message = `
-GDAX ${currency.toUpperCase()}
-<b>SELL</b> wall reach ${volume.format('$0.00a')}
-  `
-        notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message)
-        volume.set(0)
-      }
-    })
     .filter(res => res.length > 0)
     .do(points => datadog.send([
       {
@@ -75,8 +58,34 @@ GDAX ${currency.toUpperCase()}
         tags: [`gdax:${argv.env}`]
       }
     ]))
+    .mergeMap(() => {
+      if (volume.value() >= config.gdax.notify_amount.buy) {
+        const message = `
+GDAX ${currency.toUpperCase()}
+<b>BUY</b> wall reach ${volume.format('$0.00a')}
+`
+        return Observable.fromPromise(notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message))
+      }
+
+      if (volume.value() <= config.gdax.notify_amount.sell) {
+        const message = `
+GDAX ${currency.toUpperCase()}
+<b>SELL</b> wall reach ${volume.format('$0.00a')}
+  `
+        return Observable.fromPromise(notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message))
+      }
+
+      return Observable.of({})
+    })
+    .map(res => {
+      if (!isEmpty(res)) {
+        volume.set(0)
+      }
+
+      return volume
+    })
     .subscribe(
-      () => console.info(volume.format('$0.00a')),
+      (res) => console.info(res.format('$0.00a')),
       (err) => {
         console.error(err.message)
         stream()
