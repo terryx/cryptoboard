@@ -30,7 +30,7 @@ const stream = () => {
     .skip(1)
     .filter(res => res[1] === 'tu')
     .map(res => helper.getTotal(res[2][2], res[2][3]))
-    .bufferTime(10000)
+    .bufferTime(config.buffer_time)
     .filter(res => res.length > 0)
     .mergeMap(res => Observable
       .from(res)
