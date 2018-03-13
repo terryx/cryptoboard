@@ -83,5 +83,12 @@ module.exports = {
         sell: -100000
       }
     }
+  },
+  market: {
+    buffer_time: 10000,
+    alert: {
+      buy: 1000000000, // 1b
+      sell: -1000000000
+    }
   }
 }

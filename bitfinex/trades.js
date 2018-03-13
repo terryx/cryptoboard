@@ -78,7 +78,7 @@ Bitfinex ${currency.toUpperCase()}
         websocket.complete()
       },
       () => stream()
-  )
+    )
 
   return next(websocket)
 }

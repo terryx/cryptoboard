@@ -57,3 +57,4 @@ typings/
 # dotenv environment variables file
 config.*.js
 !config.sample.js
+.DS_Store
