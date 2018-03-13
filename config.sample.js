@@ -41,14 +41,8 @@ module.exports = {
       }
     }
   },
-  gemini: {
-    filter_amount: 100000,
-    currency_amount: {
-      eth: 100,
-      btc: 10
-    }
-  },
   bitfinex: {
+    buffer_time: 10000,
     filter_amount: {
       buy: 1000,
       sell: 1000

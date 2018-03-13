@@ -5,5 +5,5 @@ Display time series information to datadog via socket buffer
 ```bash
 cp config.sample.js config.dev.js
 npm install
-npm run gdax:market -- --env=dev
+node trades/notify.js --env=dev --symbol=BTCUSD --productId=BTC-USD
 ```
