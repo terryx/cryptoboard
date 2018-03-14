@@ -35,7 +35,14 @@ const stream = (defaultValue = 0) => {
 
       return Observable.fromPromise(notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message))
     })
-    .subscribe(console.info, console.error, stream)
+    .subscribe(
+      console.info,
+      (err) => {
+        console.error(err)
+        stream()
+      },
+      stream
+    )
 }
 
 stream()

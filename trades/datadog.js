@@ -33,7 +33,14 @@ const stream = () => {
         tags: [argv.env]
       }
     ]))
-    .subscribe(console.info, console.error, stream)
+    .subscribe(
+      console.info,
+      (err) => {
+        console.error(err)
+        stream()
+      },
+      stream
+    )
 }
 
 stream()
