@@ -20,7 +20,6 @@ const subject = Observable
 subject.connect()
 
 const source = () => subject
-  .startWith(0)
   .scan((acc, cur) => {
     acc = acc.add(cur)
 
