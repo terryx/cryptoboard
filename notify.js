@@ -1,12 +1,11 @@
 const { Observable, Subject } = require('rxjs')
 const { argv } = require('yargs')
 const numeral = require('numeral')
-const moment = require('moment')
 const bitfinex = require('./trades/bitfinex')
 const gdax = require('./trades/gdax')
 const gemini = require('./trades/gemini')
 const config = require(`./config.${argv.env}`)
-const datadog = require('./utils/datadog')(config.datadog.api_key)
+const notification = require('./utils/notification')
 const { currency } = argv
 
 const subject = Observable
@@ -26,17 +25,20 @@ const source = () => subject
 
     return acc
   }, numeral(0))
-  .find(total => total.value() > config.market.point.buy || total.value() < config.market.point.sell)
-  .map(total => ([ moment().format('X'), total.format('0.00') ]))
-  .do(point => datadog.send([
-    {
-      metric: `market.${argv.env}.${currency.toLowerCase()}_usd.trades`,
-      points: [ point ],
-      type: 'gauge',
-      host: 'market',
-      tags: [argv.env]
+  .do(total => console.log(total.format('0.000a')))
+  .find(total => total.value() > config.market.alert.buy || total.value() < config.market.alert.sell)
+  .mergeMap(total => {
+    let message = `${currency.toUpperCase()} market `
+    if (total.value() > 0) {
+      message += `GAIN ${total.format('0.00a')}`
     }
-  ]))
+
+    if (total.value() < 0) {
+      message += `LOST ${total.format('0.00a')}`
+    }
+
+    return Observable.fromPromise(notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message))
+  })
   .subscribe(
     (res) => {
       console.log(res)
