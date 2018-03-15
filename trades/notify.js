@@ -6,14 +6,14 @@ const gdax = require('./gdax')
 const gemini = require('./gemini')
 const config = require(`../config.${argv.env}`)
 const notification = require('../utils/notification')
-const { symbol, productId } = argv
+const { currency } = argv
 
 const stream = (defaultValue = 0) => {
-  return Observable
+  const source = Observable
     .merge(
-      bitfinex.stream(symbol),
-      gdax.stream(productId),
-      gemini.stream(symbol)
+      bitfinex.stream(currency),
+      gdax.stream(currency),
+      gemini.stream(currency)
     )
     .scan((acc, cur) => {
       acc = acc.add(cur)
@@ -21,28 +21,28 @@ const stream = (defaultValue = 0) => {
       return acc
     }, numeral(defaultValue))
     .do(total => console.log(total.format('0.000a')))
-    .filter(total => total.value() >= config.market.alert.buy || total.value() <= config.market.alert.sell)
-    .take(1)
+    .find(total => total.value() >= config.market.alert.buy || total.value() <= config.market.alert.sell)
     .mergeMap(total => {
-      let message = 'Market trades'
+      let message = `${currency.toUpperCase()} market`
       if (total.value() > 0) {
-        message += ` BUY ${total.format('0.00a')}`
+        message += ` GAIN ${total.format('0.00a')}`
       }
 
       if (total.value() < 0) {
-        message += ` SELL ${total.format('0.00a')}`
+        message += ` LOST ${total.format('0.00a')}`
       }
 
       return Observable.fromPromise(notification.sendMessage(config.telegram.bot_token, config.telegram.channel_id, message))
     })
-    .subscribe(
-      console.info,
-      (err) => {
-        console.error(err)
-        stream()
-      },
-      stream
-    )
+
+  return source.subscribe(
+    console.info,
+    (err) => {
+      console.error(err)
+      stream()
+    },
+    stream
+  )
 }
 
 stream()

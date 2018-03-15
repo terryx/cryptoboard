@@ -3,7 +3,8 @@ const numeral = require('numeral')
 const w3cwebsocket = require('websocket').w3cwebsocket
 const helper = require('../utils/helper')
 
-const stream = (symbol) => {
+const stream = (currency) => {
+  const symbol = currency.toUpperCase() + 'USD'
   const websocket = Observable.webSocket({
     url: `wss://api.gemini.com/v1/marketdata/${symbol}`,
     WebSocketCtor: w3cwebsocket

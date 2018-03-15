@@ -1,31 +1,35 @@
 const { Observable } = require('rxjs')
 const numeral = require('numeral')
-const w3cwebsocket = require('websocket').w3cwebsocket
+const { w3cwebsocket } = require('websocket')
 const helper = require('../utils/helper')
 
 const next = (socket, currency) => {
   return socket.next(JSON.stringify({
-    event: 'subscribe',
-    channel: 'trades',
-    symbol: `${currency.toUpperCase()}USD`
+    event: 'addChannel',
+    channel: `ok_sub_spot_${currency}_usdt_trade`
   }))
 }
 
 const stream = (currency) => {
   const websocket = Observable.webSocket({
-    url: `wss://api.bitfinex.com/ws/2`,
+    url: `wss://real.okex.com:10441/websocket`,
     WebSocketCtor: w3cwebsocket
   })
 
   next(websocket, currency)
 
   return websocket
-    .filter(res => Array.isArray(res))
-    .skip(1)
-    .filter(res => res[1] === 'tu')
-    .map(res => helper.getTotal(res[2][2], res[2][3]))
+    .mergeMap(res => Observable.from(res))
+    .map(res => res.data)
+    .filter(data => Array.isArray(data))
+    .mergeMap(data => Observable.from(data))
     .scan((acc, cur) => {
-      acc.add(cur)
+      const total = helper.getTotal(cur[1], cur[2])
+      if (cur[4] === 'bid') {
+        acc.add(total)
+      } else {
+        acc.subtract(total)
+      }
 
       return acc
     }, numeral(0))

@@ -3,8 +3,9 @@ const Gdax = require('gdax')
 const numeral = require('numeral')
 const helper = require('../utils/helper')
 
-const stream = (productId) => {
-  const websocket = new Gdax.WebsocketClient([productId.toUpperCase()])
+const stream = (currency) => {
+  const productId = currency.toUpperCase() + '-USD'
+  const websocket = new Gdax.WebsocketClient([ productId ])
 
   return Observable
     .fromEvent(websocket, 'message')
