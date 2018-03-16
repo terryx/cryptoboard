@@ -5,5 +5,10 @@ Display time series information to datadog via socket buffer
 ```bash
 cp config.sample.js config.dev.js
 npm install
-node usd.js --env=dev --currency=BTC
+```
+
+#### Examples
+```
+1. node report.js --env=dev --base=BTC --counter=USD
+2. node report.js --env=dev --base=BTC --counter=USDT
 ```
