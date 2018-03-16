@@ -18,6 +18,7 @@ const metric = () => subject
 
     return acc
   }, numeral(0))
+  .do(total => console.log(total.format('0.000a')))
   .find(total => total.value() > config.market.point.buy || total.value() < config.market.point.sell)
   .map(total => ([ moment().format('X'), total.format('0.00') ]))
   .do(point => datadog.send([
